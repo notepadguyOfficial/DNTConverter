@@ -6,8 +6,130 @@
 #include <sstream>
 #include <iomanip>
 #include <Windows.h>
+#include "libs/tinyxml2.h"
 
 namespace filesystem = std::filesystem;
+
+
+class XML {
+public:
+	struct Message {
+		int mid;
+		std::string text;
+	};
+
+	std::vector<Message> Data;
+
+	bool loadXML(const std::string& path) {
+		std::string xml = path + "/uistring.xml";
+		tinyxml2::XMLDocument document;
+		tinyxml2::XMLError error = document.LoadFile(xml.c_str());
+
+		if (error != tinyxml2::XML_SUCCESS) {
+			std::cerr << "Error loading XML file: " << xml << std::endl;
+			return false;
+		}
+
+		std::cout << "Successfully loaded XML file: " << xml << std::endl;
+
+		tinyxml2::XMLElement* root = document.RootElement();
+
+		if (root) {
+			std::cout << "Root element found: " << root->Name() << std::endl;
+		}
+		else {
+			std::cerr << "No root element found in XML file." << std::endl;
+			return false;
+		}
+
+		tinyxml2::XMLElement* messageElement = root->FirstChildElement("message");
+
+		while (messageElement) {
+			const char* midAttr = messageElement->Attribute("mid");
+			const char* messageText = messageElement->GetText();
+
+			if (midAttr && messageText) {
+				Message message;
+				message.mid = std::stoi(midAttr);
+				message.text = messageText;
+				Data.push_back(message);
+
+				//std::cout << "MID: " << message.mid << " | Text: " << message.text << std::endl;
+			}
+
+			messageElement = messageElement->NextSiblingElement("message");
+		}
+
+		return true;
+	}
+
+	std::string translateIDtoString(int mid) {
+		for (const auto& message : Data) {
+			if (mid == message.mid) {
+				std::cout << "Translating MID: " << mid << " | Text: " << message.text << std::endl;
+				return message.text;
+			}
+		}
+		
+		return "";
+	}
+
+	std::string processXMLMessage(int mid, const std::vector<std::string>& params) {
+		for (const auto& message : Data) {
+			if (message.mid == mid) {
+				std::string processedMessage = message.text;
+				for (int i = 0; i < params.size(); ++i) {
+					size_t pos = processedMessage.find("{" + std::to_string(i) + "}");
+					while (pos != std::string::npos) {
+						processedMessage.replace(pos, std::to_string(i).length() + 2, params[i]);
+						pos = processedMessage.find("{" + std::to_string(i) + "}", pos + 1);
+					}
+				}
+				return processedMessage;
+			}
+		}
+		return "";
+	}
+
+	std::string translateParamWithBrackets(const std::string& paramString) {
+		std::vector<std::string> params;
+		size_t pos = 0;
+		std::string _temp = paramString;
+
+		while ((pos = _temp.find("}^{")) != std::string::npos) {
+			params.push_back(_temp.substr(1, pos - 1));
+			_temp = _temp.substr(pos + 3);
+		}
+
+		if (!_temp.empty()) {
+			params.push_back(_temp.substr(1, _temp.size() - 1));
+		}
+
+		std::vector<std::string> translatedParams;
+		for (const std::string& param : params) {
+			try {
+				int id = std::stoi(param);
+				std::string translatedMessage = processXMLMessage(id, {});
+				translatedParams.push_back(translatedMessage);
+			}
+			catch (const std::exception&) {
+				std::cerr << "Error translating parameter ID: " << param << std::endl;
+				translatedParams.push_back("[Error translating]");
+			}
+		}
+
+		std::string translatedString = translatedParams.empty() ? "" : translatedParams[0];
+		for (size_t i = 1; i < translatedParams.size(); ++i) {
+			translatedString += "}^{ " + translatedParams[i] + " }";
+		}
+
+		return translatedString;
+	}
+
+	std::string translateSimpleID(int id) {
+		return processXMLMessage(id, {});
+	}
+};
 
 class Header {
 public:
@@ -52,6 +174,7 @@ public:
 class Body {
 public:
 	void readData(std::ifstream& input, const Header& header, const Column& column, std::ofstream& csv) {
+		XML xml;
 		for (int i = 0; i < header.rowCount; ++i) {
 			int32_t _ID;
 			input.read(reinterpret_cast<char*>(&_ID), sizeof(_ID));
@@ -78,7 +201,14 @@ public:
 						if (buffer[k] == ',')
 							buffer[k] = '^';
 
-					csv << buffer;
+					if (column.columnTitles[j] == "_NameID" || column.columnTitles[j] == "_DescriptionID") {
+						int id = std::stoi(buffer);
+						std::string translatedString = xml.translateIDtoString(id);
+						csv << translatedString;
+					}
+					else {
+						csv << buffer;
+					}
 					break;
 				}
 				case 2: {
@@ -170,17 +300,27 @@ int main(int argc, const char* argv[]) {
 		wchar_t buffer[MAX_PATH];
 		GetModuleFileName(NULL, buffer, MAX_PATH);
 		std::string currentDir = filesystem::path(buffer).parent_path().string();
+
+		std::string xmlFolder = currentDir + "/uistring";
 		std::string dntFolder = currentDir + "/dnt";
 		std::string outputFolder = currentDir + "/output";
+
+		if (!filesystem::exists(xmlFolder)) {
+			std::cerr << "Error: 'dnt' folder not found in the current directory." << std::endl;
+			return 1;
+		}
 
 		if (!filesystem::exists(dntFolder)) {
 			std::cerr << "Error: 'dnt' folder not found in the current directory." << std::endl;
 			return 1;
 		}
 
-		if (!filesystem::exists(outputFolder)) {
+		if (!filesystem::exists(outputFolder))
 			filesystem::create_directory(outputFolder);
-		}
+
+		XML xml;
+		if (!xml.loadXML(xmlFolder))
+			return 1;
 
 		processFolder(dntFolder, outputFolder);
 
