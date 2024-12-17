@@ -109,7 +109,7 @@
       <PreprocessorDefinitions>TINYXML2_EXPORT;_DEBUG;_CONSOLE;%(PreprocessorDefinitions);TINYXML2_EXPORT</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <AdditionalIncludeDirectories>C:\Users\Cempron\source\repos\DNTConverter\DNTConverterToString\libs;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\Cempron\source\repos\DNTConverter\DNTConverterToString\libs;C:\Users\Cempron\source\repos\DNTConverter\DNTConverterToString\Logs;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -147,7 +147,7 @@
       <PreprocessorDefinitions>TINYXML2_EXPORT;NDEBUG;_CONSOLE;%(PreprocessorDefinitions);TINYXML2_EXPORT</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <AdditionalIncludeDirectories>C:\Users\Cempron\source\repos\DNTConverter\DNTConverterToString\libs;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\Cempron\source\repos\DNTConverter\DNTConverterToString\libs;C:\Users\Cempron\source\repos\DNTConverter\DNTConverterToString\Logs;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -159,9 +159,11 @@
   <ItemGroup>
     <ClCompile Include="DNTConverterToString.cpp" />
     <ClCompile Include="libs\tinyxml2.cpp" />
+    <ClCompile Include="Logs\Logs.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="libs\tinyxml2.h" />
+    <ClInclude Include="Logs\Logs.h" />
     <ClInclude Include="resource.h" />
   </ItemGroup>
   <ItemGroup>

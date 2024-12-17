@@ -5,6 +5,9 @@
     <ClCompile Include="libs\tinyxml2.cpp">
       <Filter>Library</Filter>
     </ClCompile>
+    <ClCompile Include="Logs\Logs.cpp">
+      <Filter>LOGS</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="resource.h">
@@ -12,6 +15,9 @@
     </ClInclude>
     <ClInclude Include="libs\tinyxml2.h">
       <Filter>Library</Filter>
+    </ClInclude>
+    <ClInclude Include="Logs\Logs.h">
+      <Filter>LOGS</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -23,6 +29,9 @@
     </Filter>
     <Filter Include="Library">
       <UniqueIdentifier>{61fa42c7-05b6-410a-a50c-bf6d35e2235d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="LOGS">
+      <UniqueIdentifier>{15cf768d-3ce4-43a2-b3ef-68c13c9fda29}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

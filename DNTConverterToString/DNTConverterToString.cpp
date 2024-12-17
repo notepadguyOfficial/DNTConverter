@@ -1,4 +1,5 @@
 #include <iostream>
+#include "Logs/Logs.h"
 #include <fstream>
 #include <vector>
 #include <string>
@@ -21,7 +22,7 @@ public:
 	std::vector<Message> Data;
 
 	bool loadXML(const std::string& path) {
-		std::string xml = path + "/uistring.xml";
+		std::string xml = path + "\\uistring.xml";
 		tinyxml2::XMLDocument document;
 		tinyxml2::XMLError error = document.LoadFile(xml.c_str());
 
@@ -29,13 +30,13 @@ public:
 			std::cerr << "Error loading XML file: " << xml << std::endl;
 			return false;
 		}
-
-		std::cout << "Successfully loaded XML file: " << xml << std::endl;
+		
+		LOG_INFO("Successfully loaded XML file: " + xml);
 
 		tinyxml2::XMLElement* root = document.RootElement();
 
 		if (root) {
-			std::cout << "Root element found: " << root->Name() << std::endl;
+			LOG_INFO("Root element found: " + std::string(root->Name()));
 		}
 		else {
 			std::cerr << "No root element found in XML file." << std::endl;
@@ -43,91 +44,64 @@ public:
 		}
 
 		tinyxml2::XMLElement* messageElement = root->FirstChildElement("message");
+		int _tCount = 0;
+
+		while (messageElement) {
+			_tCount++;
+			messageElement = messageElement->NextSiblingElement("message");
+		}
+		
+		LOG_INFO("XML First Check Line Count: " + std::to_string(_tCount));
+
+		messageElement = root->FirstChildElement("message");
+
+		int _mCount = 0;
 
 		while (messageElement) {
 			const char* midAttr = messageElement->Attribute("mid");
-			const char* messageText = messageElement->GetText();
+
+			const char* messageText = nullptr;
+			tinyxml2::XMLNode* cdataNode = messageElement->FirstChild();
+
+			if (cdataNode && cdataNode->ToText()) {
+				messageText = cdataNode->ToText()->Value();
+			}
 
 			if (midAttr && messageText) {
 				Message message;
 				message.mid = std::stoi(midAttr);
 				message.text = messageText;
 				Data.push_back(message);
-
-				//std::cout << "MID: " << message.mid << " | Text: " << message.text << std::endl;
+				_mCount++;
 			}
 
 			messageElement = messageElement->NextSiblingElement("message");
 		}
+
+		LOG_INFO("XML Line Count: " + std::to_string(_mCount));
+
+		LOG_INFO("Finished processing " + std::to_string(_mCount) + "out of " + std::to_string(_tCount));
 
 		return true;
 	}
 
 	std::string translateIDtoString(int mid) {
 		for (const auto& message : Data) {
-			if (mid == message.mid) {
-				std::cout << "Translating MID: " << mid << " | Text: " << message.text << std::endl;
+/* Only for extreme checking in details
+
+#ifdef _DEBUG
+			LOG_INFO("Checking MID: " + std::to_string(message.mid));
+#endif
+*/
+			if (message.mid == mid) {
+#ifdef _DEBUG
+				LOG_INFO("Translating MID: " + std::to_string(mid) + " | Text: " + message.text);
+#endif
 				return message.text;
 			}
 		}
 		
 		return "";
-	}
-
-	std::string processXMLMessage(int mid, const std::vector<std::string>& params) {
-		for (const auto& message : Data) {
-			if (message.mid == mid) {
-				std::string processedMessage = message.text;
-				for (int i = 0; i < params.size(); ++i) {
-					size_t pos = processedMessage.find("{" + std::to_string(i) + "}");
-					while (pos != std::string::npos) {
-						processedMessage.replace(pos, std::to_string(i).length() + 2, params[i]);
-						pos = processedMessage.find("{" + std::to_string(i) + "}", pos + 1);
-					}
-				}
-				return processedMessage;
-			}
-		}
-		return "";
-	}
-
-	std::string translateParamWithBrackets(const std::string& paramString) {
-		std::vector<std::string> params;
-		size_t pos = 0;
-		std::string _temp = paramString;
-
-		while ((pos = _temp.find("}^{")) != std::string::npos) {
-			params.push_back(_temp.substr(1, pos - 1));
-			_temp = _temp.substr(pos + 3);
-		}
-
-		if (!_temp.empty()) {
-			params.push_back(_temp.substr(1, _temp.size() - 1));
-		}
-
-		std::vector<std::string> translatedParams;
-		for (const std::string& param : params) {
-			try {
-				int id = std::stoi(param);
-				std::string translatedMessage = processXMLMessage(id, {});
-				translatedParams.push_back(translatedMessage);
-			}
-			catch (const std::exception&) {
-				std::cerr << "Error translating parameter ID: " << param << std::endl;
-				translatedParams.push_back("[Error translating]");
-			}
-		}
-
-		std::string translatedString = translatedParams.empty() ? "" : translatedParams[0];
-		for (size_t i = 1; i < translatedParams.size(); ++i) {
-			translatedString += "}^{ " + translatedParams[i] + " }";
-		}
-
-		return translatedString;
-	}
-
-	std::string translateSimpleID(int id) {
-		return processXMLMessage(id, {});
 	}
 };
 
@@ -173,8 +147,7 @@ public:
 
 class Body {
 public:
-	void readData(std::ifstream& input, const Header& header, const Column& column, std::ofstream& csv) {
-		XML xml;
+	void readData(std::ifstream& input, const Header& header, const Column& column, std::ofstream& csv, XML& xml) {
 		for (int i = 0; i < header.rowCount; ++i) {
 			int32_t _ID;
 			input.read(reinterpret_cast<char*>(&_ID), sizeof(_ID));
@@ -197,42 +170,89 @@ public:
 					input.read(buffer, length);
 					buffer[length] = '\0';
 
+
 					for (int k = 0; k < length; ++k)
 						if (buffer[k] == ',')
 							buffer[k] = '^';
 
-					if (column.columnTitles[j] == "_NameID" || column.columnTitles[j] == "_DescriptionID") {
-						int id = std::stoi(buffer);
-						std::string translatedString = xml.translateIDtoString(id);
-						csv << translatedString;
-					}
-					else {
-						csv << buffer;
-					}
+					csv << buffer;
+#ifdef _DEBUG
+					std::string _temp = "Title: " + std::string(column.columnTitles[j]) + " | Type: 1 | Value: " + buffer;
+					LOG_INFO(_temp);
+#endif
+
 					break;
 				}
 				case 2: {
 					int32_t value;
 					input.read(reinterpret_cast<char*>(&value), sizeof(value));
 					csv << value;
+#ifdef _DEBUG
+					std::string _temp = "Title: " + std::string(column.columnTitles[j]) + " | Type: 2 | Value: " + std::to_string(value);
+					LOG_INFO(_temp);
+#endif
 					break;
 				}
 				case 3: {
 					int32_t value;
 					input.read(reinterpret_cast<char*>(&value), sizeof(value));
-					csv << value;
+
+					if (column.columnTitles[j] == "_NameID") {
+#ifdef _DEBUG
+						LOG_INFO("Translating! Please wait.");
+#endif
+						std::string translatedString = xml.translateIDtoString(value);
+						csv << translatedString;
+
+#ifdef _DEBUG
+						std::string _temp = "Title: " + std::string(column.columnTitles[j]) + " | Type: 3 | Value: " + std::to_string(value);
+						LOG_INFO(_temp);
+#endif
+/* Not Practical to Translate Description
+					}
+
+					else if (column.columnTitles[j] == "_DescriptionID") {
+#ifdef _DEBUG
+						LOG_INFO("Translating! Please wait.");
+#endif
+						std::string translatedString = xml.translateIDtoString(value);
+						csv << translatedString;
+
+#ifdef _DEBUG
+						std::string _temp = "Title: " + std::string(column.columnTitles[j]) + " | Type: 3 | Value: " + std::to_string(value);
+						LOG_INFO(_temp);
+#endif
+*/
+					}
+					else {
+						csv << value;
+
+#ifdef _DEBUG
+						std::string _temp = "Title: " + std::string(column.columnTitles[j]) + " | Type: 3 | Value: " + std::to_string(value);
+						LOG_INFO(_temp);
+#endif
+					}
+
 					break;
 				}
 				case 4: {
 					float value;
 					input.read(reinterpret_cast<char*>(&value), sizeof(value));
 					csv << value;
+#ifdef _DEBUG
+					std::string _temp = "Title: " + std::string(column.columnTitles[j]) + " | Type: 4 | Value: " + std::to_string(value);
+					LOG_INFO(_temp);
+#endif
 					break;
 				}
 				case 5: {
 					float value;
 					input.read(reinterpret_cast<char*>(&value), sizeof(value));
 					csv << value;
+#ifdef _DEBUG
+					std::string _temp = "Title: " + std::string(column.columnTitles[j]) + " | Type: 5 | Value: " + std::to_string(value);
+					LOG_INFO(_temp);
+#endif
 					break;
 				}
 				default:
@@ -244,7 +264,7 @@ public:
 	}
 };
 
-void processDntFile(const std::string& path, const std::string& outputDir) {
+void processDntFile(const std::string& path, const std::string& outputDir, XML& xml) {
 	std::ifstream _file(path, std::ios::binary);
 
 	if (!_file.is_open()) {
@@ -275,7 +295,7 @@ void processDntFile(const std::string& path, const std::string& outputDir) {
 		}
 		csv << "\n";
 
-		body.readData(_file, header, column, csv);
+		body.readData(_file, header, column, csv, xml);
 
 		csv.close();
 		std::cout << "Processed: " << path << " -> " << output << std::endl;
@@ -287,23 +307,26 @@ void processDntFile(const std::string& path, const std::string& outputDir) {
 	_file.close();
 }
 
-void processFolder(const std::string& folder, const std::string& outputDir) {
+void processFolder(const std::string& folder, const std::string& outputDir, XML& xml) {
 	for (const auto& entry : filesystem::directory_iterator(folder)) {
 		if (entry.is_regular_file() && entry.path().extension() == ".dnt") {
-			processDntFile(entry.path().string(), outputDir);
+			processDntFile(entry.path().string(), outputDir, xml);
 		}
 	}
 }
 
 int main(int argc, const char* argv[]) {
 	try {
+		Log.Initialized(argv[0]);
+		XML xml;
+
 		wchar_t buffer[MAX_PATH];
 		GetModuleFileName(NULL, buffer, MAX_PATH);
 		std::string currentDir = filesystem::path(buffer).parent_path().string();
 
-		std::string xmlFolder = currentDir + "/uistring";
-		std::string dntFolder = currentDir + "/dnt";
-		std::string outputFolder = currentDir + "/output";
+		std::string xmlFolder = currentDir + "\\uistring";
+		std::string dntFolder = currentDir + "\\dnt";
+		std::string outputFolder = currentDir + "\\output";
 
 		if (!filesystem::exists(xmlFolder)) {
 			std::cerr << "Error: 'dnt' folder not found in the current directory." << std::endl;
@@ -318,11 +341,10 @@ int main(int argc, const char* argv[]) {
 		if (!filesystem::exists(outputFolder))
 			filesystem::create_directory(outputFolder);
 
-		XML xml;
 		if (!xml.loadXML(xmlFolder))
 			return 1;
 
-		processFolder(dntFolder, outputFolder);
+		processFolder(dntFolder, outputFolder, xml);
 
 		std::cout << "Processing completed. Output saved in 'output' folder." << std::endl;
 	}
@@ -330,6 +352,10 @@ int main(int argc, const char* argv[]) {
 		std::cerr << "Error: " << ex.what() << std::endl;
 		return 1;
 	}
+
+#ifdef _DEBUG
+	system("pause");
+#endif
 
 	return 0;
 }
