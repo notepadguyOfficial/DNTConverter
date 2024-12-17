@@ -6,7 +6,6 @@
 #include <sstream>
 #include <iomanip>
 #include <Windows.h>
-#include "libs/tinyxml2.h"
 
 namespace filesystem = std::filesystem;
 
@@ -173,11 +172,6 @@ int main(int argc, const char* argv[]) {
 		std::string currentDir = filesystem::path(buffer).parent_path().string();
 		std::string dntFolder = currentDir + "/dnt";
 		std::string outputFolder = currentDir + "/output";
-
-		if (!filesystem::exists(xmlFolder)) {
-			std::cerr << "Error: 'dnt' folder not found in the current directory." << std::endl;
-			return 1;
-		}
 
 		if (!filesystem::exists(dntFolder)) {
 			std::cerr << "Error: 'dnt' folder not found in the current directory." << std::endl;
